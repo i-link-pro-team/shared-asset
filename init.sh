@@ -1,10 +1,6 @@
 #!/bin/bash
 
-mkdir build 
-cd build
-cmake ..
-make
-cd -
+. build.sh
 
 cat /project/password | cleos wallet unlock
 
