@@ -49,7 +49,8 @@ public:
     *                             a link to an image of a lot. Not used by contract, required for backend.
     */
    [[eosio::action]]
-   void create(const name& issuer, 
+   void create(const name& issuer,
+               token_id id, 
                int status,
                const std::string& lot_name,
                const std::string& lot_description,

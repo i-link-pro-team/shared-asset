@@ -12,8 +12,8 @@ cleos set contract shared.asset ./build/contracts/asset/ shared_asset.wasm share
 
 cleos push action shared.asset setconfig '{"config": {"symbol_code":"TEZRO"}}' -p shared.asset@active
 
-cleos push action shared.asset create '["shared.asset", 0, "lot.1", "lot.description", "additional.field.1", "additional.field.2", "additional.field.3"]' -p shared.asset@active
-cleos push action shared.asset create '["shared.asset", 0, "lot.2", "lot.description", "additional.field.1", "additional.field.2", "additional.field.3"]' -p shared.asset@active
+cleos push action shared.asset create '["shared.asset", 0, 0, "lot.1", "lot.description", "additional.field.1", "additional.field.2", "additional.field.3"]' -p shared.asset@active
+cleos push action shared.asset create '["shared.asset", 1, 0, "lot.2", "lot.description", "additional.field.1", "additional.field.2", "additional.field.3"]' -p shared.asset@active
 
 cleos get table shared.asset shared.asset tokens
 

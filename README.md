@@ -6,8 +6,8 @@ All build artifacts will be stored in `./build/contracts`.
 
 ```shell
 docker build -t shared.asset .
-docker run -it -v $(pwd):/project/contracts -p 8888:8888 -p 9876:9876 shared.asset
-. init.sh
+docker run -it -v $(pwd):/project/contracts shared.asset
+. build.sh
 ```
 
 To run the eos node, you can use the same docker image and play 
@@ -15,8 +15,8 @@ around with the deployed contract.
 
 ```shell
 docker build -t shared.asset .
-docker run -it -v $(pwd):/project/contracts shared.asset
-. build.sh
+docker run -it -v $(pwd):/project/contracts -p 8888:8888 -p 9876:9876 shared.asset
+. init.sh
 ```
 
 ## Actions
@@ -40,6 +40,7 @@ created. Called only after calling setconfig.
 cleos push action shared.asset create \
     '{
         "issuer": "shared.asset",
+        "id": 1,
         "status": 0,
         "lot_name": "lot.1",
         "lot_description": "lot.description",

@@ -22,7 +22,8 @@ void shared_asset::setconfig(const token_config& config)
     config_for_token.set(config, get_self());
 }
 
-void shared_asset::create(const name& issuer, 
+void shared_asset::create(const name& issuer,
+                          token_id id,
                           int status,
                           const std::string& lot_name,
                           const std::string& lot_description,
@@ -32,6 +33,7 @@ void shared_asset::create(const name& issuer,
 {
     require_auth(get_self());
 
+    check(config_for_token.exists(), "the configuration must be set");
     auto config = config_for_token.get();
     symbol symbol(config.symbol_code, 0);
 
@@ -41,8 +43,11 @@ void shared_asset::create(const name& issuer,
     check(additional_field_2.size() <= 256, "additional_field_2 has more than 256 bytes");
     check(additional_field_3.size() <= 256, "additional_field_3 has more than 256 bytes");
 
+    auto existing = tokens.find(id);
+    check(existing == tokens.end(), "token with this id has already been created");
+
     tokens.emplace(get_self(), [&](auto& token) {
-        token.id                 = tokens.available_primary_key();
+        token.id                 = id;
         token.issuer             = issuer;
         token.max_supply         = asset{MAX_SUPPLY_AMOUNT, symbol};
         token.supply             = asset{0, symbol};
@@ -57,6 +62,7 @@ void shared_asset::create(const name& issuer,
 
 void shared_asset::issue(const name& to, token_id token_id, const std::string& memo)
 {
+    check(config_for_token.exists(), "the configuration must be set");
     auto config = config_for_token.get();
     symbol symbol(config.symbol_code, 0);
     const asset quantity(SUPPLY_AMOUNT, symbol);
