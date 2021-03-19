@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include <eosio/eosio.hpp>
 #include <eosio/asset.hpp>
@@ -146,17 +147,28 @@ public:
    {
       asset          supply;             // current supply
       asset          max_supply;         // max supply
-      std::string    lot_name;           // lot name
-      std::string    lot_description;    // lot name
-      std::string    additional_field_1; // any additional information
-      std::string    additional_field_2; // any additional information
-      std::string    additional_field_3; // any additional information
       name           issuer;             // user who can manage token
       token_id       id;                 // token id
-      int            status;             // lot status
 
       uint64_t primary_key() const { return id; }
    };
+
+   struct owner_info {
+      name name;
+      eosio::asset balance;
+   };
+
+   struct [[eosio::table("lots")]] lot
+   {
+      std::vector<owner_info>    owners;             // lot owners
+      std::string                lot_name;           // lot name
+      std::string                lot_description;    // lot name
+      std::string                additional_field_1; // any additional information
+      std::string                additional_field_2; // any additional information
+      std::string                additional_field_3; // any additional information
+      int                        status;             // lot status
+   };
+   
 
    // scope is owner
    struct [[eosio::table]] account
@@ -173,6 +185,7 @@ private:
    static constexpr uint64_t SUPPLY_AMOUNT = MAX_SUPPLY_AMOUNT;
 
    typedef eosio::singleton<"token.config"_n, token_config> token_config_singleton;
+   typedef eosio::singleton<"lots"_n, lot> lots_singleton; 
    typedef eosio::multi_index<"tokens"_n, token> tokens_index;
    typedef eosio::multi_index<"accounts"_n, account> accounts_index;
 
@@ -185,6 +198,8 @@ private:
                     const eosio::name& ram_payer);
 
    void sub_balance(const name& owner, token_id token_id, const asset& value);
+
+   asset get_balance(const name& owner, token_id token_id);
 };
 
 } // namespace shared_asset
