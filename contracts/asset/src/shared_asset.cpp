@@ -44,6 +44,8 @@ void shared_asset::create(const name& issuer,
     check(additional_field_3.size() <= 256, "additional_field_3 has more than 256 bytes");
 
     auto existing = tokens.find(id);
+    lots_singleton lot_index(get_self(), id);
+    check(!lot_index.exists(), "lot with this id has already ben created");
     check(existing == tokens.end(), "token with this id has already been created");
 
     tokens.emplace(get_self(), [&](auto& token) {
@@ -51,13 +53,19 @@ void shared_asset::create(const name& issuer,
         token.issuer             = issuer;
         token.max_supply         = asset{MAX_SUPPLY_AMOUNT, symbol};
         token.supply             = asset{0, symbol};
-        token.status             = status;
-        token.lot_name           = lot_name;
-        token.lot_description    = lot_description;
-        token.additional_field_1 = additional_field_1;
-        token.additional_field_2 = additional_field_2;
-        token.additional_field_3 = additional_field_3;        
     });
+
+    lot lot = {
+        {},                     // lot owners
+        lot_name,               // lot name
+        lot_description,        // lot name
+        additional_field_1,     // any additional information
+        additional_field_2,     // any additional information
+        additional_field_3,     // any additional information
+        status                  // lot status
+    };
+
+    lot_index.set(lot, get_self());
 }
 
 void shared_asset::issue(const name& to, token_id token_id, const std::string& memo)
@@ -74,6 +82,9 @@ void shared_asset::issue(const name& to, token_id token_id, const std::string& m
     check(existing != tokens.end(), "token with this id does not exist, create token before issue");
     const auto& token = *existing;
 
+    lots_singleton lot_index(get_self(), token_id);
+    check(lot_index.exists(), "lot with this id does not exist, create before issue");
+
     require_auth(token.issuer);
     check(quantity.amount > 0, "must issue positive quantity");
     check(quantity.symbol == token.max_supply.symbol, "symbol precision mismatch");
@@ -82,6 +93,10 @@ void shared_asset::issue(const name& to, token_id token_id, const std::string& m
     tokens.modify(token, eosio::same_payer, [&](auto& t) {
         t.supply += quantity;
     });
+
+    auto lot = lot_index.get();
+    lot.owners.push_back({to, quantity});
+    lot_index.set(lot, get_self());
 
     add_balance(to, token_id, quantity, token.issuer);
 }
@@ -94,6 +109,8 @@ void shared_asset::transfer(const name& from, const name& to, token_id token_id,
     check(memo.size() <= 256, "memo has more than 256 bytes");
 
     const auto& token = tokens.get(token_id, "token with this id does not exist");
+    lots_singleton lot_index(get_self(), token_id);
+    check(lot_index.exists(), "lot with this id does not exist");
 
     check(quantity.amount > 0, "must transfer positive quantity");
     check(quantity.symbol == token.max_supply.symbol, "symbol precision mismatch");
@@ -103,6 +120,33 @@ void shared_asset::transfer(const name& from, const name& to, token_id token_id,
 
     sub_balance(from, token_id, quantity);
     add_balance(to, token_id, quantity, payer);
+
+    auto lot = lot_index.get();
+
+    // update information about the owner
+    auto from_it = std::find_if(lot.owners.begin(), lot.owners.end(), [&](const owner_info& owner) { 
+        return from == owner.name;
+    });
+
+    // the owner has transferred all tokens. we remove it from the owners.
+    if (0 == get_balance(from, token_id).amount) {
+        lot.owners.erase(from_it);
+    } else {
+        from_it->balance -= quantity;
+    }
+
+    // update information about the new owner
+    auto to_it = std::find_if(lot.owners.begin(), lot.owners.end(), [&](owner_info& owner) {
+        return to == owner.name;
+    });
+
+    if (to_it == lot.owners.end()) {
+        lot.owners.push_back({to, quantity});
+    } else {
+        to_it->balance += quantity;
+    }
+
+    lot_index.set(lot, get_self());
 }
 
 void shared_asset::add_balance(const eosio::name& owner, 
@@ -136,16 +180,25 @@ void shared_asset::sub_balance(const name& owner, token_id token_id, const eosio
     });
 }
 
+asset shared_asset::get_balance(const name& owner, token_id token_id)
+{
+    accounts_index from_acnts(get_self(), owner.value);
+    const auto& from = from_acnts.get(token_id, "no balance object found");
+    return from.balance;
+}
+
 void shared_asset::setstatus(token_id token_id, int status)
 {
     const auto& token = tokens.get(token_id, "token with this id does not exist");
     require_auth(token.issuer);
+    
+    lots_singleton lot_index(get_self(), token_id);
+    auto lot = lot_index.get();
 
     check(status > 0, "must be positive");
 
-    tokens.modify(token, eosio::same_payer, [&](auto& t) {
-        t.status = status;
-    });
+    lot.status = status;
+    lot_index.set(lot, get_self());
 }
 
 void shared_asset::setlotname(token_id token_id, const std::string& lot_name)
@@ -153,11 +206,13 @@ void shared_asset::setlotname(token_id token_id, const std::string& lot_name)
     const auto& token = tokens.get(token_id, "token with this id does not exist");
     require_auth(token.issuer);
 
+    lots_singleton lot_index(get_self(), token_id);
+    auto lot = lot_index.get();
+
     check(lot_name.size() <= 256, "lot_name has more than 256 bytes");
 
-    tokens.modify(token, eosio::same_payer, [&](auto& t) {
-        t.lot_name = lot_name;
-    });
+    lot.lot_name = lot_name;
+    lot_index.set(lot, get_self());
 }
 
 void shared_asset::setlotdesc(token_id token_id, const std::string& lot_description)
@@ -165,11 +220,13 @@ void shared_asset::setlotdesc(token_id token_id, const std::string& lot_descript
     const auto& token = tokens.get(token_id, "token with this id does not exist");
     require_auth(token.issuer);
 
+    lots_singleton lot_index(get_self(), token_id);
+    auto lot = lot_index.get();
+
     check(lot_description.size() <= 256, "lot_description has more than 256 bytes");
 
-    tokens.modify(token, eosio::same_payer, [&](auto& t) {
-        t.lot_description = lot_description;
-    });
+    lot.lot_description = lot_description;
+    lot_index.set(lot, get_self());
 }
 
 void shared_asset::setaddfield1(token_id token_id, const std::string& additional_field_1)
@@ -177,11 +234,13 @@ void shared_asset::setaddfield1(token_id token_id, const std::string& additional
     const auto& token = tokens.get(token_id, "token with this id does not exist");
     require_auth(token.issuer);
 
+    lots_singleton lot_index(get_self(), token_id);
+    auto lot = lot_index.get();
+
     check(additional_field_1.size() <= 256, "additional_field_1 has more than 256 bytes");
 
-    tokens.modify(token, eosio::same_payer, [&](auto& t) {
-        t.additional_field_1 = additional_field_1;
-    });
+    lot.additional_field_1 = additional_field_1;
+    lot_index.set(lot, get_self());
 }
 
 void shared_asset::setaddfield2(token_id token_id, const std::string& additional_field_2)
@@ -189,11 +248,13 @@ void shared_asset::setaddfield2(token_id token_id, const std::string& additional
     const auto& token = tokens.get(token_id, "token with this id does not exist");
     require_auth(token.issuer);
 
+    lots_singleton lot_index(get_self(), token_id);
+    auto lot = lot_index.get();
+
     check(additional_field_2.size() <= 256, "additional_field_2 has more than 256 bytes");
 
-    tokens.modify(token, eosio::same_payer, [&](auto& t) {
-        t.additional_field_2 = additional_field_2;
-    });
+    lot.additional_field_2 = additional_field_2;
+    lot_index.set(lot, get_self());
 }
 
 void shared_asset::setaddfield3(token_id token_id, const std::string& additional_field_3)
@@ -201,11 +262,13 @@ void shared_asset::setaddfield3(token_id token_id, const std::string& additional
     const auto& token = tokens.get(token_id, "token with this id does not exist");
     require_auth(token.issuer);
 
+    lots_singleton lot_index(get_self(), token_id);
+    auto lot = lot_index.get();
+
     check(additional_field_3.size() <= 256, "additional_field_3 has more than 256 bytes");
 
-    tokens.modify(token, eosio::same_payer, [&](auto& t) {
-        t.additional_field_3 = additional_field_3;
-    });
+    lot.additional_field_3 = additional_field_3;
+    lot_index.set(lot, get_self());
 }
 
 } // namespace asset

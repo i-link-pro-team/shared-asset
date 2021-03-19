@@ -24,3 +24,18 @@ cleos get table shared.asset shared.asset tokens
 
 cleos push action shared.asset transfer '["alice", "bob", 0, "50 TEZRO", ""]' -p alice@active
 cleos push action shared.asset transfer '["alice", "bob", 1, "1 TEZRO", ""]' -p alice@active
+
+cleos get table shared.asset 0 lots
+cleos get table shared.asset 1 lots
+
+cleos push action shared.asset transfer '["alice", "bob", 0, "50 TEZRO", ""]' -p alice@active
+cleos push action shared.asset transfer '["alice", "bob", 1, "1 TEZRO", ""]' -p alice@active
+
+cleos get table shared.asset 0 lots
+cleos get table shared.asset 1 lots
+
+cleos push action shared.asset setlotname '[0, "some name"]'  -p shared.asset@active
+cleos push action shared.asset transfer '["bob", "max", 0, "100 TEZRO", ""]' -p bob@active
+
+cleos get table shared.asset 0 lots
+cleos get table shared.asset 1 lots
