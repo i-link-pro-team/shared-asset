@@ -1,3 +1,5 @@
+![Logo](https://i.postimg.cc/xCtC038W/ilink.png)
+
 # Shared Asset contract
 
 ## Build and Run
